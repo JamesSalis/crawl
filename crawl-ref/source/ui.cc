@@ -12,7 +12,6 @@
 #include "cio.h"
 
 #ifdef USE_TILE_LOCAL
-# include "windowmanager.h"
 # include "glwrapper.h"
 # include "tilebuf.h"
 #else
@@ -32,6 +31,15 @@ static i4 aabb_intersect(i4 a, i4 b)
     return i;
 }
 
+static inline bool pos_in_rect(i2 pos, i4 rect)
+{
+    if (pos[0] < rect[0] || pos[0] >= rect[0]+rect[2])
+        return false;
+    if (pos[1] < rect[1] || pos[1] >= rect[1]+rect[3])
+        return false;
+    return true;
+}
+
 static void ui_push_scissor(i4 scissor);
 static void ui_pop_scissor();
 static i4 ui_get_scissor();
@@ -47,6 +55,8 @@ public:
     void layout();
     void render();
 
+    bool on_event(wm_event event);
+
 protected:
     int m_w, m_h;
     i4 m_region;
@@ -55,6 +65,48 @@ protected:
 } ui_root;
 
 static stack<i4> scissor_stack;
+
+struct UI::slots UI::slots = {};
+
+bool UI::on_event(wm_event event)
+{
+    if (event.type == WME_KEYDOWN || event.type == WME_KEYUP)
+        return UI::slots.key_event.emit(this, event);
+    else
+        return false;
+}
+
+static inline bool _maybe_propagate_event(wm_event event, shared_ptr<UI> &child)
+{
+#ifdef USE_TILE_LOCAL
+    if (event.type == WME_MOUSEMOTION)
+    {
+        i2 pos = i2((int)event.mouse_event.px, (int)event.mouse_event.py);
+        if (!pos_in_rect(pos, child->get_region()))
+            return false;
+    }
+#endif
+    return child->on_event(event);
+}
+
+bool UIContainer::on_event(wm_event event)
+{
+    if (UI::on_event(event))
+        return true;
+    for (shared_ptr<UI> &child : *this)
+        if (_maybe_propagate_event(event, child))
+            return true;
+    return false;
+}
+
+bool UIBin::on_event(wm_event event)
+{
+    if (UI::on_event(event))
+        return true;
+    if (_maybe_propagate_event(event, m_child))
+        return true;
+    return false;
+}
 
 void UI::render()
 {
@@ -552,6 +604,15 @@ void UIStack::_allocate_region()
     }
 }
 
+bool UIStack::on_event(wm_event event)
+{
+    if (UI::on_event(event))
+        return true;
+    if (m_children.size() > 0 &&_maybe_propagate_event(event, m_children.back()))
+        return true;
+    return false;
+}
+
 void UIGrid::add_child(shared_ptr<UI> child, int x, int y, int w, int h)
 {
     child_info ch = { {x, y}, {w, h}, move(child) };
@@ -791,6 +852,11 @@ void UIRoot::render()
 #endif
 }
 
+bool UIRoot::on_event(wm_event event)
+{
+    return m_root.on_event(event);
+}
+
 static void ui_push_scissor(i4 scissor)
 {
     if (scissor_stack.size() > 0)
@@ -856,6 +922,7 @@ void ui_pump_events()
         }
 
         default:
+            ui_root.on_event(event);
             break;
     }
 #else
@@ -870,6 +937,13 @@ void ui_pump_events()
         console_shutdown();
         console_startup();
         ui_root.resize(get_number_of_cols(), get_number_of_lines());
+    }
+    else
+    {
+        wm_event ev = {0};
+        ev.type = WME_KEYDOWN;
+        ev.key.keysym.sym = k;
+        ui_root.on_event(ev);
     }
 #endif
 }
