@@ -1050,20 +1050,17 @@ static int _describe_cloud(const string &key, const string &suffix,
 static int _describe_item(const string &key, const string &suffix,
                            string footer)
 {
-    item_def item;
-    string stats;
-    if (get_item_by_name(&item, key.c_str(), OBJ_WEAPONS)
-        || get_item_by_name(&item, key.c_str(), OBJ_ARMOUR)
-        || get_item_by_name(&item, key.c_str(), OBJ_MISSILES)
-        || get_item_by_name(&item, key.c_str(), OBJ_BOOKS)
-        || get_item_by_name(&item, key.c_str(), OBJ_MISCELLANY))
+    for (unsigned i = 0; i < NUM_OBJECT_CLASSES; i++)
     {
-        // don't request description since _describe_key handles that
-        stats = get_item_description(item, true, false, true);
+        item_def item;
+        if (get_item_by_name(&item, key.c_str(), static_cast<object_class_type>(i)))
+        {
+            describe_item(item);
+            return 0;
+        }
     }
-    // spellbooks are interactive & so require special handling
-
-    return _describe_key(key, suffix, footer, stats);
+    die("Unable to get item %s by name", key.c_str());
+    return 0;
 }
 
 /**
