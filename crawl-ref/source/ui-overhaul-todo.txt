@@ -1,0 +1,17 @@
+Known issues with the stuff in this branch
+------------------------------------------
+
+- mouse events aren't handled at all, so all the UIs which claim to support
+  right-clicking to toggle between panes.. don't. I'd rather not use some
+  pseudo-key hack, but haven't looked much at the other key-handling code yet.
+
+- when switching from new UI to old, bits of the screen may not be
+  redrawn correctly on local tiles. E.g. inv -> book -> spell -> memorize shows
+  a blank sidebar, and probably others I'm forgetting
+
+- descriptions with Xv draw the viewport centred on the player
+
+- event handlers are currently attached to a slot called 'key_event': originally
+  planned to have more, but this part of the API may need rethinking.
+
+vim: set tw=80 :
