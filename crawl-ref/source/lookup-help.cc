@@ -554,6 +554,22 @@ static MenuEntry* _simple_menu_gen(char letter, const string &str, string &key)
     return me;
 }
 
+static monster_info _fake_monster_for_name(const string& name)
+{
+    monster_type m_type = _mon_by_name(name);
+    ASSERT(m_type != MONS_PROGRAM_BUG);
+
+    monster_type base_type = MONS_NO_MONSTER;
+    // HACK: Set an arbitrary humanoid monster as base type.
+    if (mons_class_is_zombified(m_type))
+        base_type = MONS_GOBLIN;
+    // FIXME: This doesn't generate proper draconian monsters.
+    monster_info fake_mon(m_type, base_type);
+    fake_mon.props["fake"] = true;
+
+    return fake_mon;
+}
+
 /**
  * Generate a ?/M entry.
  *
@@ -565,22 +581,11 @@ static MenuEntry* _simple_menu_gen(char letter, const string &str, string &key)
 static MenuEntry* _monster_menu_gen(char letter, const string &str,
                                     monster_info &mslot)
 {
-    // Create and store fake monsters, so the menu code will
-    // have something valid to refer to.
-    monster_type m_type = _mon_by_name(str);
+    mslot = _fake_monster_for_name(str);
     const string name = _is_soh(str) ? "The Serpent of Hell" : str;
 
-    monster_type base_type = MONS_NO_MONSTER;
-    // HACK: Set an arbitrary humanoid monster as base type.
-    if (mons_class_is_zombified(m_type))
-        base_type = MONS_GOBLIN;
-    // FIXME: This doesn't generate proper draconian monsters.
-    monster_info fake_mon(m_type, base_type);
-    fake_mon.props["fake"] = true;
-
-    mslot = fake_mon;
-
 #ifndef USE_TILE_LOCAL
+    monster_type m_type = _mon_by_name(name);
     int colour = mons_class_colour(m_type);
     if (colour == BLACK)
         colour = LIGHTGREY;
@@ -971,16 +976,7 @@ static int _describe_generic(const string &key, const string &suffix,
 static int _describe_monster(const string &key, const string &suffix,
                              string footer)
 {
-    const monster_type mon_num = _mon_by_name(key);
-    ASSERT(mon_num != MONS_PROGRAM_BUG);
-    // Don't attempt to get more information on ghost demon
-    // monsters, as the ghost struct has not been initialised, which
-    // will cause a crash. Similarly for zombified monsters, since
-    // they require a base monster.
-    if (mons_is_ghost_demon(mon_num) || mons_class_is_zombified(mon_num))
-        return _describe_generic(key, suffix, footer);
-
-    monster_info mi(mon_num);
+    monster_info mi = _fake_monster_for_name(key);
     // Avoid slime creature being described as "buggy"
     if (mi.type == MONS_SLIME_CREATURE)
         mi.slime_size = 1;

@@ -4425,7 +4425,17 @@ int describe_monsters(const monster_info &mi, bool force_seen,
     describe_info inf;
     formatted_string desc;
 
-    get_monster_db_desc(mi, inf, has_stat_desc, force_seen);
+    // Handle fake generic monsters from ?/m
+    bool fake = mi.props.exists("fake") && mi.props["fake"].get_bool();
+    if (fake && (mons_is_ghost_demon(mi.type) || mons_class_is_zombified(mi.type)))
+    {
+        const string key = mons_type_name(mi.type, DESC_PLAIN);
+        inf.title = key;
+        inf.quote = getQuoteString(key);
+        inf.body << getLongDescription(key);
+    }
+    else
+        get_monster_db_desc(mi, inf, has_stat_desc, force_seen);
 
     spellset spells = monster_spellset(mi);
 
